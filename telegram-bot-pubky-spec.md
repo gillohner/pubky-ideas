@@ -296,17 +296,6 @@ The bot supports four types of services:
 - Sends proactive messages to chats
 - Example: Daily digest of new content
 
-### Security Model
-
-The sandbox provides strong isolation:
-
-- **Process isolation**: Each service runs in a separate Deno process
-- **Permission model**: Default deny-all, explicit allow-list for network access
-- **Resource limits**: CPU time, and execution timeout limits
-- **No filesystem access**: Services cannot read/write files
-- **No environment variables**: Clean execution environment
-- **Network filtering**: Only allowed domains can be accessed
-
 ### Per‑chat routing and dispatch
 
 - Snapshot build (per chat)
