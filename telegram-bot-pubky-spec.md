@@ -782,6 +782,7 @@ Notes
 - Allow-net semantics: the allowlist maps to Deno's `--allow-net` host list and is checked against the URL host, not the resolved IP. If you pass `--allow-net` without hosts, all outbound requests are allowed; always provide a comma-separated host list per service.
 - Optional deny layering: consider parent-process checks to block known-bad targets or to pin DNS if higher assurance is needed.
 - Filesystem reads: do not grant `--allow-read`. Run code via stdin or data URLs or pre-mount read-only artifacts to stay aligned with "no filesystem access".
+- Whitelist of allowed Services in Bot-Core could be implemented.
 
 ### Configuration Security
 
