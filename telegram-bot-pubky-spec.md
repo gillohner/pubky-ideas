@@ -36,8 +36,6 @@ flowchart LR
   TG --> U
 ```
 
-https://mermaid.live/edit#pako:eNpVkU1vwjAMhv9K5XNBCf3OYYeuUzWNDba1hy3lkFEDFbRBIdXGKv47baYhOMV-4ve1LXewlCUCg9VOfi83Qmlr-lY0lpXz_IBqYY1Gd1aW8gx3uFaiXgx_WWpwPMt4LLVBfWzYPI-fPvi8_doeb3gS8_fXaaXxhqaPGU-rW4fk4WXGE2ykoUP23-y6KkuvBsnBhrWqSmArsTugDTWqWgw5dENZAXqDNRbA-rAUaltA0Zx60V40n1LWwLRqe5mS7XpzMWn3pdCYVGLY-0IVNiWqe9k2GpjnGg9gHfwAi8h44lBCQ-L7LvEnng1HYDRwx6FPaeB5TkBJ5IQnG35NVzIOIscNg15EnP7xqA1YVlqq57-jmNuczo3Ueqg
-
 The system consists of several key components:
 
 - **Bot Core (Telegraf)**: Handles Telegram API communication
@@ -58,8 +56,6 @@ flowchart TD
   D --> E[Execute in Deno sandbox]
   E --> F[Send reply to user]
 ```
-
-https://mermaid.live/edit#pako:eNpFkctOwzAQRX9lNOu0NC83yQKJNoUNbHhsSLowyeQhEruyndJS9d9xXQG7seacO2PNCStZE2bYDPKr6rgy8JqXAuCueNOkQJOoNdxUchy5qLcwm93CqniUvAZLG6ikaPp2ezFWrrkunknLYU9WVfu-IrAe1NxwTUY7cO3A_JrySzVKjlDxqiOQCh5649DcoZtic6BqMgS9gJyEBG1DP-TBMRvH3BcvdlVQtBuOYCRMNniLHraqrzFr-KDJw5HUyC9vPF3MEk1HI5WY2bLm6rPEUpyttOPiXcoRM6Mmqyk5td1fyLSzv6G8563i_4gdTmotJ2Ewi10CZic8YOYH4TwNl0niRyxdBixmHh4xS8J5GKUsjv3YD9nST88efruZi3nCFkkcpUnAgjBifuAh1b2R6ul6Knex8w-DkorJ
 
 ### Simple Flow Example
 
