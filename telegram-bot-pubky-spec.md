@@ -1081,23 +1081,6 @@ Notes:
 - Deno caches remote modules globally in DENO_DIR; use `--reload` to refresh
   specific modules and `deno info` to inspect cache location.
 
-### Dataset Schema Validation
-
-Supported schemas (initial):
-
-- `links@1`
-  - Shape: `{ categories: Array<{ name: string; links: Array<{ title: string; url: string }> }> }`
-  - Rules:
-    - At least one category
-    - Each link must have a valid absolute URL (http/https)
-    - Title length <= 120 chars; category name length <= 64 chars
-    - Total links per dataset <= 2000 (guardrail)
-
-Validation strategy:
-
-- Perform schema-aware validation when caching datasets.
-- On validation failure, keep the previous cached version (if any) and surface a `DataValidationError` to services; do not pass malformed data into sandboxes.
-
 ---
 
 ## 🛡️ Security Considerations
