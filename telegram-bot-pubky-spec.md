@@ -378,7 +378,6 @@ State directive application
   - `merge`: compute `next_state = deepMerge(current_state, value)` in parent process, then update using the guarded `UPDATE` shown above.
 - If the guarded update affects 0 rows, treat as a version conflict and apply the retry policy.
 
-````
 ### Service Types
 
 The bot supports four types of services:
@@ -476,13 +475,16 @@ The bot supports four types of services:
 - Size budget: total length <= 64 bytes (Telegram limit). Keep `<sid>` and tokens short.
 
 Examples
+
 - `svc:meetups|f:tw` → service `meetups`, key `f` (filter) `tw` (this week)
 - `svc:links|c:gen;p:2` → service `links`, category `gen`, page `2`
 
 Parsing
 
 ```ts
-function parseCallbackData(data: string): { sid: string; params: Record<string, string> } | null {
+function parseCallbackData(
+  data: string
+): { sid: string; params: Record<string, string> } | null {
   if (!data.startsWith("svc:")) return null;
   const [svcPart, pairPart = ""] = data.split("|");
   const sid = svcPart.slice(4);
@@ -496,7 +498,7 @@ function parseCallbackData(data: string): { sid: string; params: Record<string, 
   }
   return { sid, params };
 }
-````
+```
 
 ### Service Development Interface
 
