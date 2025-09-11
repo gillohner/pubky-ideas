@@ -311,7 +311,7 @@ const db = new DB("./bot.sqlite");
 
 SQLite tables for persistence:
 
-````sql
+```sql
 -- Chat-specific configuration overrides
 CREATE TABLE chat_configs (
     chat_id TEXT PRIMARY KEY,
@@ -346,6 +346,7 @@ CREATE TABLE flow_state (
     expires_at TIMESTAMP NOT NULL,
     PRIMARY KEY (chat_id, service_id)
 );
+```
 
 #### Optimistic Locking Semantics
 
@@ -363,7 +364,7 @@ SET state_json = :next_state,
 WHERE chat_id = :chat_id
   AND service_id = :service_id
   AND version = :expected_version;
-````
+```
 
 - Detect conflict by checking `changes() == 1` (SQLite) or affected rows.
 - Retry policy: up to 3 retries with small jitter; on persistent conflict, abort
