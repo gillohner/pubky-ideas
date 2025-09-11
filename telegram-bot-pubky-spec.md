@@ -2,22 +2,33 @@
 
 ## 🎯 Executive Summary
 
-A **modular Telegram bot framework** that combines the power of decentralized configuration with sandboxed TypeScript services. Think of it as a bot that can be easily customized per chat without code changes, where all configuration and datasets live on Pubky homeservers, and custom functionality is loaded from Git repositories and executed in secure sandboxes.
+A **modular Telegram bot framework** that combines the power of decentralized
+configuration with sandboxed TypeScript services. Think of it as a bot that can
+be easily customized per chat without code changes, where all configuration and
+datasets live on Pubky homeservers, and custom functionality is loaded from Git
+repositories and executed in secure sandboxes.
 
 ### Key Features at a Glance
 
-- **🔧 Per-chat configuration** - Each chat can ha-ve its own bot behavior by setting a config through admin-commands.
+- **🔧 Per-chat configuration** - Each chat can have its own bot behavior by
+  setting a config through admin-commands.
 - **📦 Modular services** - Add functionality by referencing Git repositories
-- **🔒 Sandboxed execution** - Services run in isolated Deno processes with strict permissions
-- **🌐 Decentralized config** - All configuration and datasets stored on Pubky homeservers. Users can easily switch to their own Bot instance. Additional implementatitions for different chat-platforms would allow simple switching.
+- **🔒 Sandboxed execution** - Services run in isolated Deno processes with
+  strict permissions
+- **🌐 Decentralized config** - All configuration and datasets stored on Pubky
+  homeservers. Users can easily switch to their own Bot instance. Additional
+  implementations for different chat-platforms would allow simple switching.
 - **⚡ Zero-downtime updates** - Change behavior without restarting the bot
 
 ### What Problems Does This Solve?
 
-1. **No more bot proliferation** - One bot, many configurations instead of many specialized bots
-2. **Easy customization** - Chat admins can modify behavior without developer intervention
+1. **No more bot proliferation** - One bot, many configurations instead of many
+   specialized bots
+2. **Easy customization** - Chat admins can modify behavior without developer
+   intervention
 3. **Secure extensibility** - Add features from untrusted sources safely
-4. **Decentralized control** - No central authority controls your bot's configuration
+4. **Decentralized control** - No central authority controls your bot's
+   configuration
 
 ---
 
@@ -38,11 +49,15 @@ flowchart LR
 
 The system consists of several key components:
 
-- **Bot Core (Telegraf)**: Handles Telegram API communication
-- **Config Manager**: Loads configuration from Pubky homeservers and manages chat-specific overrides
-- **Service Registry**: Clones, builds, and caches TypeScript services from Git repositories
-- **Sandbox Host**: Executes services in isolated Deno processes with strict security
-- **Local Database (SQLite)**: Caches configurations, services, and manages chat state
+- **Bot Core (grammY)**: Handles Telegram API communication
+- **Config Manager**: Loads configuration from Pubky homeservers and manages
+  chat-specific overrides
+- **Service Registry**: Resolves and caches ESM services from jsr (preferred) or
+  pinned Git repositories
+- **Sandbox Host**: Executes services in isolated Deno processes with strict
+  security
+- **Local Database (SQLite)**: Caches configurations, services, and manages chat
+  state
 
 ---
 
@@ -62,7 +77,7 @@ flowchart TD
 1. User types `/links` in a chat
 2. Bot checks if chat has custom config, otherwise uses default
 3. Finds the "links" service in the config
-4. Loads the service from Git repo (cached locally)
+4. Loads the service from jsr (or pinned Git) and caches it
 5. Loads the relevant Datasets from Homeservers (cached locally)
 6. Spawns a secure Deno process with the service
 7. Service generates response
@@ -97,19 +112,26 @@ DEFAULT_CONFIG_URL=pubky://{pub}/pub/pubky-bot-builder/bot-configs/default.json
 
 The bot follows these architectural principles:
 
-1. **Read-only Pubky integration** - Bot only reads from homeservers, never writes
-2. **Telegraf for Telegram** - Standard, well-tested library for Telegram Bot API
-3. **SQLite for local state** - Simple, reliable persistence for chat mappings and caches
-4. **Git-based services** - All functionality comes from versioned Git repositories
+1. **Read-only Pubky integration** - Bot only reads from homeservers, never
+   writes
+2. **grammY for Telegram** - Standard, well-tested library for Telegram Bot API
+3. **SQLite for local state** - Simple, reliable persistence for chat mappings
+   and caches
+4. **jsr-first services** - All functionality comes from published jsr packages
+   (pinned versions); pinned Git refs are an optional fallback
 5. **Security-first sandbox** - Services run with minimal permissions in Deno
 
 ### Directory Structure on Pubky Homeservers
 
-Use the stable base path `/pub/pubky-bot-builder/` with Pubky.app‑style identifiers:
+Use the stable base path `/pub/pubky-bot-builder/` with Pubky.app‑style
+identifiers:
 
-- Bot configs: `/pub/pubky-bot-builder/bot-configs/{config_id}.json` where `{config_id}` is a Timestamp ID (13‑char Crockford Base32).
-- Service configs: `/pub/pubky-bot-builder/service-configs/{service_id}.json` where `{service_id}` is a Timestamp ID (13‑char Crockford Base32).
-- Datasets: `/pub/pubky-bot-builder/datasets/{dataset_id}.json` where `{dataset_id}` is a Timestamp ID (13‑char Crockford Base32).
+- Bot configs: `/pub/pubky-bot-builder/bot-configs/{config_id}.json` where
+  `{config_id}` is a Timestamp ID (13‑char Crockford Base32).
+- Service configs: `/pub/pubky-bot-builder/service-configs/{service_id}.json`
+  where `{service_id}` is a Timestamp ID (13‑char Crockford Base32).
+- Datasets: `/pub/pubky-bot-builder/datasets/{dataset_id}.json` where
+  `{dataset_id}` is a Timestamp ID (13‑char Crockford Base32).
 
 Example URIs:
 
@@ -157,9 +179,9 @@ Object shapes (trimmed examples)
   "kind": "command_flow",
   "created_at": 1731171200,
   "source": {
-    "repo": "https://github.com/example/meetups-flow.git",
-    "ref": "<commit-or-immutable-tag>",
-    "entry": "src/index.ts"
+    "type": "jsr",
+    "package": "@gillohner/meetups_flow",
+    "version": "1.0.0"
   },
   "capabilities": {
     "allowNetwork": true,
@@ -175,6 +197,49 @@ Object shapes (trimmed examples)
       "cal": "pubky://{pub}/pub/pubky-bot-builder/datasets/0000000000002.json"
     },
     "timezone": "Europe/Zurich"
+  }
+}
+```
+
+Service IPC template (stdin → stdout JSON):
+
+```ts
+// mod.ts (service entry)
+async function readLine(): Promise<string> {
+  const dec = new TextDecoder();
+  const buf = new Uint8Array(8192);
+  const n = await Deno.stdin.read(buf);
+  if (n === null) return "";
+  return dec.decode(buf.subarray(0, n)).trim();
+}
+
+type ExecutePayload = { event: any; ctx: any };
+
+const raw = await readLine();
+const payload = JSON.parse(raw) as ExecutePayload;
+const result = await service.execute(payload.event, payload.ctx);
+console.log(JSON.stringify(result) + "\n");
+```
+
+Alternative (Git fallback, pinned commit only):
+
+```json
+{
+  "id": "0000000000001",
+  "name": "Meetups Flow",
+  "kind": "command_flow",
+  "created_at": 1731171200,
+  "source": {
+    "type": "git",
+    "repo": "https://github.com/example/meetups-flow.git",
+    "commit": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+    "entry": "src/index.ts"
+  },
+  "capabilities": {
+    /* ... */
+  },
+  "default_config": {
+    /* ... */
   }
 }
 ```
@@ -228,11 +293,25 @@ SERVICE_CACHE_DIR=.service-cache
 SANDBOX_DEFAULT_TIMEOUT_MS=5000
 ```
 
+#### Deno runtime specifics
+
+- Use `Deno.env.get` for configuration and run with `--allow-env`.
+- For SQLite, prefer Deno-first drivers. Example: `jsr:@db/sqlite@0.12` or `https://deno.land/x/sqlite@v3/mod.ts`.
+  If using Node bindings, import with `npm:` (e.g., `npm:better-sqlite3`) and grant `--allow-read --allow-write` only to the DB path.
+- Prefer import maps in `deno.json` for stable specifiers; use `deno.lock` for integrity and `--reload` to refresh cache when updating dependencies.
+
+Example import (Deno-first):
+
+```ts
+import { DB } from "https://deno.land/x/sqlite@v3.9.1/mod.ts";
+const db = new DB("./bot.sqlite");
+```
+
 ### Local Database Schema
 
 SQLite tables for persistence:
 
-```sql
+````sql
 -- Chat-specific configuration overrides
 CREATE TABLE chat_configs (
     chat_id TEXT PRIMARY KEY,
@@ -262,12 +341,44 @@ CREATE TABLE flow_state (
     chat_id TEXT NOT NULL,
     service_id TEXT NOT NULL,
     state_json TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
     updated_at TIMESTAMP NOT NULL,
     expires_at TIMESTAMP NOT NULL,
     PRIMARY KEY (chat_id, service_id)
 );
-```
 
+#### Optimistic Locking Semantics
+
+- Read: `SELECT state_json, version FROM flow_state WHERE chat_id=? AND service_id=?`.
+- Update: increment `version` only if it matches the previously read value.
+
+SQL example
+
+```sql
+UPDATE flow_state
+SET state_json = :next_state,
+    version = version + 1,
+    updated_at = :now,
+    expires_at = :exp
+WHERE chat_id = :chat_id
+  AND service_id = :service_id
+  AND version = :expected_version;
+````
+
+- Detect conflict by checking `changes() == 1` (SQLite) or affected rows.
+- Retry policy: up to 3 retries with small jitter; on persistent conflict, abort
+  the step with a soft error and ask the user to retry.
+
+State directive application
+
+- On incoming `callback`, load `(state_json, version)` and pass them to the service as `event.state` and `event.stateVersion`.
+- When the service returns a response with `state`:
+  - `clear`: delete row `DELETE FROM flow_state WHERE chat_id=? AND service_id=?`.
+  - `replace`: upsert row with `state_json = JSON(value)`, `version = version + 1` guarded by `version = :expected_version`.
+  - `merge`: compute `next_state = deepMerge(current_state, value)` in parent process, then update using the guarded `UPDATE` shown above.
+- If the guarded update affects 0 rows, treat as a version conflict and apply the retry policy.
+
+````
 ### Service Types
 
 The bot supports four types of services:
@@ -281,7 +392,7 @@ The bot supports four types of services:
 #### 2. Command Flow (`command_flow`)
 
 - Multi-step interactions with conversation state
-- Uses inline keyboards and callback queries
+- Uses inline keyboards and callback queries via grammY
 - Example: `/meetups` → filter options → results → details
 
 #### 3. Listener (`listener`)
@@ -319,9 +430,10 @@ The bot supports four types of services:
 - Callback queries (flows)
 
   - callback_data prefix: "svc:<service_id>|<payload>".
-  - Router extracts service_id, loads flow_state(chat_id, service_id), invokes onFlowStep.
+  - Router extracts service_id, loads flow_state(chat_id, service_id), invokes service.execute with a `callback` event.
   - Keep callback payloads compact; Telegram enforces strict size limits for callback_data.
   - State is updated per step; start/end is managed by the flow’s command and completion logic.
+  - Keep callback_data under 64 bytes. Use short IDs: `svc:<sid>|<k>:<v>` where `<sid>` and values are compact. Store large payloads server-side and reference by short token.
 
 - Listeners
 
@@ -341,42 +453,106 @@ The bot supports four types of services:
   - Clear state on flow completion or expiry.
 
 - Periodic execution
+
   - Scheduler enumerates snapshot.periodic per chat and triggers on schedule.
   - Uses the same permissions, dataset resolution, and sandbox execution path as commands.
 
+#### Cron-like Scheduling for Periodic Commands
+
+- Schedule format: standard 5-field cron (minute hour day-of-month month day-of-week), UTC by default.
+- Storage: each periodic service in chat snapshot includes `{ schedule: string }`. If omitted, default is daily at 09:00 local to chat’s timezone if provided, else UTC.
+- Evaluation: a single scheduler tick every minute matches due entries and enqueues executions. Skips missed runs during downtime; does not catch up.
+- Concurrency: per chat and per service mutual exclusion. If the previous run is still active, skip the current tick.
+- Jitter: add 0–10s random delay to reduce thundering herd across chats.
+- Error policy: log errors and continue. Apply backoff if a service fails consecutively more than N times (e.g., exponential up to 1 hour), then resume normal schedule after a success.
+
+- After snapshot changes, update commands via `bot.api.setMyCommands([...], { scope: { type: "chat", chat_id } })` and still enforce checks at runtime.
+- Normalize commands and `callback_query:data` as `svc:<service_id>|<payload>` and route to service flow handlers.
+
+#### Compact Callback Data Format
+
+- Wire format: `svc:<sid>|<pairs>` where `<sid>` is a short service ID (<= 8 chars), and `<pairs>` is a `:`-prefixed sequence of `k:v` tokens separated by `;`.
+- Allowed chars: `[A-Za-z0-9_.-]` for both keys and values to avoid encoding.
+- Size budget: total length <= 64 bytes (Telegram limit). Keep `<sid>` and tokens short.
+
+Examples
+- `svc:meetups|f:tw` → service `meetups`, key `f` (filter) `tw` (this week)
+- `svc:links|c:gen;p:2` → service `links`, category `gen`, page `2`
+
+Parsing
+
+```ts
+function parseCallbackData(data: string): { sid: string; params: Record<string, string> } | null {
+  if (!data.startsWith("svc:")) return null;
+  const [svcPart, pairPart = ""] = data.split("|");
+  const sid = svcPart.slice(4);
+  const params: Record<string, string> = {};
+  if (pairPart) {
+    for (const kv of pairPart.split(";")) {
+      if (!kv) continue;
+      const [k, v = ""] = kv.split(":");
+      if (k) params[k] = v;
+    }
+  }
+  return { sid, params };
+}
+````
+
 ### Service Development Interface
 
-Services implement a standard TypeScript interface:
+Services implement a standard TypeScript interface with a single entry point:
 
 ```typescript
 export interface Service {
-  metadata: {
-    name: string;
-    version: string;
-    description: string;
-    author: string;
-    type: ServiceKind;
-  };
-
-  // Lifecycle hooks
-  init?: (ctx: BootContext) => Promise<void>;
-  dispose?: () => Promise<void>;
-
-  // Command handlers
-  onCommand?: (message: any, ctx: ServiceContext) => Promise<void>;
-  onFlowStart?: (message: any, ctx: ServiceContext) => Promise<void>;
-  onFlowStep?: (
-    message: any,
-    state: Record<string, any>,
-    ctx: ServiceContext
-  ) => Promise<void>;
-
-  // Message processing
-  onMessage?: (message: any, ctx: ServiceContext) => Promise<void>;
-
-  // Scheduled execution
-  onScheduled?: (ctx: ServiceContext) => Promise<void>;
+  metadata: ServiceMetadata;
+  execute(event: ServiceEvent, ctx: ServiceContext): Promise<ServiceResponse>;
 }
+
+export interface ServiceMetadata {
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  type: ServiceKind;
+}
+
+export type ServiceEvent =
+  | { type: "command"; message: Message }
+  | {
+      type: "callback";
+      query: CallbackQuery;
+      state?: Record<string, any>;
+      stateVersion?: number;
+    }
+  | { type: "message"; message: Message }
+  | { type: "scheduled"; trigger: string };
+
+export type ServiceKind =
+  | "single_command"
+  | "command_flow"
+  | "listener"
+  | "periodic_command";
+
+export type StateDirective =
+  | { op: "clear" }
+  | { op: "replace"; value: Record<string, any> }
+  | { op: "merge"; value: Record<string, any> };
+
+export type ServiceResponse =
+  | {
+      kind: "reply";
+      text: string;
+      options?: ReplyOptions;
+      state?: StateDirective;
+    }
+  | {
+      kind: "edit";
+      text: string;
+      options?: ReplyOptions;
+      state?: StateDirective;
+    }
+  | { kind: "none"; state?: StateDirective }
+  | { kind: "error"; message: string };
 ```
 
 ### Runtime Context
@@ -385,27 +561,13 @@ Services receive a context object with limited capabilities:
 
 ```typescript
 export interface ServiceContext {
-  // Telegram API (proxied through parent)
-  reply: (text: string, options?: ReplyOptions) => Promise<void>;
-  editMessageText: (text: string, options?: ReplyOptions) => Promise<void>;
-  inlineKeyboard: (rows: ButtonRow[]) => any;
-
-  // Configuration and data
+  // Serializable-only data available inside the sandboxed service
   datasets: Record<string, any>;
   serviceConfig: Record<string, any>;
-
-  // Utilities
-  buildActionUrl: (endpoint: string, payload: Record<string, any>) => string;
-
-  // State management (for flows)
-  state: {
-    set: (key: string, value: any, ttlSeconds?: number) => Promise<void>;
-    get: (key: string) => Promise<any>;
-    clear: () => Promise<void>;
-  };
-
-  // Logging
-  log: (level: "debug" | "info" | "warn" | "error", msg: string) => void;
+  chatId: string;
+  userId: string;
+  locale?: string;
+  timezone?: string;
 }
 ```
 
@@ -425,9 +587,14 @@ const service: Service = {
     type: "single_command",
   },
 
-  async onCommand(message, ctx) {
+  async execute(event, ctx) {
+    if (event.type !== "command") return { kind: "none" };
     const greeting = ctx.serviceConfig.greeting ?? "Hello!";
-    await ctx.reply(greeting, { disable_web_page_preview: true });
+    return {
+      kind: "reply",
+      text: greeting,
+      options: { disable_web_page_preview: true },
+    };
   },
 };
 
@@ -446,33 +613,35 @@ const service: Service = {
     type: "command_flow",
   },
 
-  async onFlowStart(message, ctx) {
-    await ctx.state.clear();
-
-    const keyboard = ctx.inlineKeyboard([
-      [{ text: "This week", callback_data: "filter:this_week" }],
-      [{ text: "Next week", callback_data: "filter:next_week" }],
-      [{ text: "All upcoming", callback_data: "filter:all" }],
-    ]);
-
-    await ctx.reply("Choose a time filter:", { reply_markup: keyboard });
-  },
-
-  async onFlowStep(message, state, ctx) {
-    const callbackData = message.callback_query?.data;
-
-    if (callbackData?.startsWith("filter:")) {
-      const filter = callbackData.split(":")[1];
-      await ctx.state.set("selectedFilter", filter);
-
-      // Fetch and display filtered meetups
-      const meetups = await this.fetchMeetups(filter, ctx);
-      await ctx.editMessageText(this.formatMeetups(meetups));
+  async execute(event, ctx) {
+    if (event.type === "command") {
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "This week", callback_data: "svc:meetups|f:tw" }],
+          [{ text: "Next week", callback_data: "svc:meetups|f:nw" }],
+          [{ text: "All upcoming", callback_data: "svc:meetups|f:all" }],
+        ],
+      } as const;
+      return {
+        kind: "reply",
+        text: "Choose a time filter:",
+        options: { reply_markup: keyboard },
+        state: { op: "clear" },
+      };
     }
-  },
-
-  async fetchMeetups(filter: string, ctx: ServiceContext) {
-    // Implementation details...
+    if (event.type === "callback") {
+      const data = event.query.data ?? "";
+      const parsed = parseCallbackData(data);
+      const filter = parsed?.params["f"] ?? "all";
+      const next = { selectedFilter: filter };
+      const meetups = await fetchMeetups(filter, ctx);
+      return {
+        kind: "edit",
+        text: formatMeetups(meetups),
+        state: { op: "merge", value: next },
+      };
+    }
+    return { kind: "none" };
   },
 };
 
@@ -491,59 +660,78 @@ const service: Service = {
     type: "listener",
   },
 
-  async onMessage(message, ctx) {
-    if (!message.entities?.some((e) => e.type === "url")) return;
-
-    const text = message.text || "";
-    const cleanedUrls = this.cleanTrackingParams(text, ctx.serviceConfig);
-
-    if (cleanedUrls.length > 0) {
-      await ctx.reply(`Cleaned URLs:\n${cleanedUrls.join("\n")}`);
-    }
-  },
-
-  cleanTrackingParams(text: string, config: any): string[] {
-    // Implementation details...
-    return [];
+  async execute(event, ctx) {
+    if (event.type !== "message") return { kind: "none" };
+    const msg = event.message;
+    if (!msg.entities?.some((e) => e.type === "url")) return { kind: "none" };
+    const text = msg.text || "";
+    const cleanedUrls = cleanTrackingParams(text, ctx.serviceConfig);
+    if (cleanedUrls.length === 0) return { kind: "none" };
+    return { kind: "reply", text: `Cleaned URLs:\n${cleanedUrls.join("\n")}` };
   },
 };
 
 export default service;
+// helpers
+function cleanTrackingParams(text: string, config: any): string[] {
+  // Implementation details...
+  return [];
+}
 ```
 
 ---
 
 ## 🔧 Implementation Details
 
-### Telegraf Integration
+### grammY Integration (Deno)
 
-The bot uses Telegraf for Telegram API communication:
+The bot uses grammY with Deno-first ESM imports. Prefer import maps and
+lockfiles for stability.
 
-```typescript
-import { Telegraf } from "telegraf";
+Example `deno.json`:
 
-const bot = new Telegraf(process.env.BOT_TOKEN!);
+```jsonc
+{
+  "imports": {
+    "grammy": "https://deno.land/x/grammy@v1.20.4/mod.ts",
+    "grammy/web": "https://deno.land/x/grammy@v1.20.4/web.ts"
+  },
+  "lock": true,
+  "tasks": {
+    "dev": "deno run -A --watch src/bot.ts",
+    "cache": "deno cache -A src/bot.ts"
+  }
+}
+```
+
+Long polling (local development):
+
+```ts
+// src/bot.ts
+import { Bot, InlineKeyboard } from "grammy";
+
+const token = Deno.env.get("BOT_TOKEN");
+if (!token) throw new Error("BOT_TOKEN is required");
+const bot = new Bot(token);
 
 // Admin commands
 bot.command("setconfig", async (ctx) => {
   if (!(await isAdmin(ctx))) return;
-  const [, url] = (ctx.message.text || "").split(" ");
+  const [, url] = (ctx.message?.text || "").split(" ");
   if (!url?.startsWith("pubky://")) return;
-
-  await persistChatConfig(ctx.chat.id, url);
+  await persistChatConfig(String(ctx.chat.id), url);
   await ctx.reply("✅ Configuration updated for this chat.");
 });
 
 // Service discovery
 bot.command("services", async (ctx) => {
-  const config = await getActiveConfig(ctx.chat.id);
+  const config = await getActiveConfig(String(ctx.chat.id));
   const svcEntries = await Promise.all(
-    (config.services || []).map(async (entry) => ({
+    (config.services || []).map(async (entry: any) => ({
       entry,
       svc: await getServiceConfig(entry.service_config_ref),
     }))
   );
-
   const commands = (
     await Promise.all(
       svcEntries.map(async ({ entry, svc }) => {
@@ -556,101 +744,219 @@ bot.command("services", async (ctx) => {
   )
     .filter(Boolean)
     .join("\n");
-
   await ctx.reply(`Available commands:\n${commands}`);
+});
+
+// Example inline keyboard usage with grammY
+bot.command("hello", async (ctx) => {
+  const kb = new InlineKeyboard().text("Click me", "svc:hello|start");
+  await ctx.reply("Hi!", { reply_markup: kb });
+});
+
+await bot.start();
+```
+
+Webhook (production):
+
+```ts
+// src/webhook.ts
+import { Bot } from "grammy";
+import { webhookCallback } from "grammy/web";
+
+const token = Deno.env.get("BOT_TOKEN");
+if (!token) throw new Error("BOT_TOKEN is required");
+const bot = new Bot(token);
+
+// ... register handlers like above ...
+
+const handleUpdate = webhookCallback(bot, "std/http");
+Deno.serve({ port: Number(Deno.env.get("PORT") ?? 8080) }, (req) => {
+  // Optionally restrict by secret path
+  if (new URL(req.url).pathname !== "/tg-webhook") {
+    return new Response("Not found", { status: 404 });
+  }
+  return handleUpdate(req);
 });
 ```
 
-### Service Loading and Caching
+Notes:
 
-Services are loaded from Git repositories and cached locally:
+- Use URL and jsr specifiers for imports in Deno, and prefer an import map via
+  deno.json for cleaner local specifiers.
+- For production webhooks, wire `webhookCallback` and `Deno.serve` as shown; for
+  local development, `bot.start()` long polling is simplest.
+- Always pass tokens via environment variables (`Deno.env.get`) and grant
+  `--allow-env` at runtime.
 
-```typescript
+### Service Loading and Caching (Deno ESM + jsr)
+
+Services are sourced as ESM from immutable Git refs, `jsr:` packages, or `npm:`
+specifiers, and executed by Deno with correct cache semantics.
+
+Key rules
+
+- Prefer `jsr:` for published, versioned services (immutable versions). Example:
+  `jsr:@gillohner/meetups@1.2.0`.
+- For Git, require a commit SHA in the URL and load via
+  `https://raw.githubusercontent.com/<org>/<repo>/<sha>/<path>.ts` or an import
+  proxy that pins the ref.
+- For `npm:` dependencies inside services, Deno resolves via Node compatibility;
+  keep them minimal.
+- Cache policy: rely on Deno’s global module cache and lockfile; use SQLite only
+  to map service refs → resolved entry URLs and metadata.
+
+Example loader outline:
+
+```ts
+type SourceRef =
+  | { type: "jsr"; spec: string } // e.g., jsr:@gillohner/meetups@1.2.0
+  | { type: "git"; rawUrl: string } // pinned raw URL to ESM entry
+  | { type: "url"; href: string };
+
 class ServiceLoader {
-  async loadService(serviceConfig: ServiceConfig): Promise<LoadedService> {
-    const cacheKey = `${serviceConfig.source.repo}:${serviceConfig.source.ref}`;
-
-    // Check cache first
-    const cached = await this.getFromCache(cacheKey);
-    if (cached && cached.version_hash === serviceConfig.source.ref) {
-      return cached;
+  async resolveEntry(
+    svcCfg: ServiceConfig
+  ): Promise<{ entry: string; hash: string }> {
+    if (svcCfg.source.type === "jsr") {
+      const spec = `jsr:${svcCfg.source.package}@${svcCfg.source.version}`;
+      return { entry: spec, hash: spec };
     }
+    if (svcCfg.source.type === "git") {
+      const base = svcCfg.source.repo.replace(/\.git$/, "");
+      const entry = `${base.replace(
+        "https://github.com/",
+        "https://raw.githubusercontent.com/"
+      )}/${svcCfg.source.commit}/${svcCfg.source.entry}`;
+      return { entry, hash: `${svcCfg.source.repo}@${svcCfg.source.commit}` };
+    }
+    if (svcCfg.source.type === "url") {
+      return { entry: svcCfg.source.href, hash: svcCfg.source.href };
+    }
+    throw new Error("Invalid service source");
+  }
 
-    // Clone/pull repository
-    const repoPath = await this.cloneRepo(
-      serviceConfig.source.repo,
-      serviceConfig.source.ref
-    );
+  async preload(entry: string) {
+    // Warm Deno cache; parent process runs with --cached-only in prod after initial cache
+    // deno cache can be executed out-of-band; at runtime, first import will populate cache.
+  }
 
-    // Build TypeScript to single JS bundle
-    const bundlePath = await this.buildService(
-      repoPath,
-      serviceConfig.source.entry
-    );
-
-    // Validate service interface
-    const service = await this.validateService(bundlePath);
-
-    // Cache for future use
-    await this.cacheService(cacheKey, bundlePath, service);
-
-    return service;
+  async validate(entry: string): Promise<ServiceMeta> {
+    // Option 1: spawn a Deno sandbox to import the module and assert interface shape
+    // Option 2: static type-check via JSR types if provided
+    return { name: "tbd", version: "tbd" } as any;
   }
 }
 ```
 
-Packaging and execution
+Execution strategies
 
-- Build a single ESM bundle using a bundler like esbuild or rolldown; or
-- Ship ESM modules as-is and execute via a data URL or feed code through stdin to avoid filesystem reads.
-- Keep the sandbox at `--deny-all` and only add `--allow-net=<hosts>` when required. Avoid `--allow-read` by delivering code via stdin/data URLs.
+- Direct import by sandbox via entry specifier (preferred). No bundling
+  required; rely on Deno’s ESM loader.
+- Optional bundling: build a single ESM file with `deno bundle` for performance.
+  Feed via `data:` URL to avoid `--allow-read`.
+- Use `deno cache` during deployment to prefetch all modules; refresh with
+  `--reload` when upgrading versions.
 
-### Sandbox Execution
+Error handling
 
-Services run in isolated Deno processes using Deno.Command:
+- Service load failures: surface `ServiceLoadError` with details (source type,
+  spec, underlying cause). Fallback by disabling the service in the chat
+  snapshot and logging.
+- Pubky network errors: retry with exponential backoff (3 attempts), then return
+  cached data if available; emit `DataFetchError` otherwise.
+- Database issues: wrap in `StorageError` and continue with in-memory fallbacks
+  where safe; abort critical paths with user-friendly error messages.
+- Sandbox timeouts: throw `SandboxTimeoutError` and reply with a generic error;
+  consider increasing timeout only if declared in capabilities.
 
-```typescript
+### Service Validation
+
+Before a service is enabled, validate:
+
+- Interface shape: module exports a default object implementing `Service` with
+  `metadata` and `execute(event, ctx)`.
+- Metadata sanity: `name`, `version` (semver), `type` in allowed `ServiceKind`.
+- Security checks: static scan for disallowed globals (e.g., direct Deno APIs)
+  if sandbox policy forbids them; require capabilities declaration for network
+  and FS.
+
+Validator interface:
+
+```ts
+interface ServiceValidator {
+  validateInterface(
+    entry: string
+  ): Promise<{ ok: true } | { ok: false; errors: string[] }>;
+  checkSecurity(
+    entry: string
+  ): Promise<{ warnings: string[]; violations: string[] }>;
+}
+```
+
+Implementation note: run validation in a locked-down sandbox that only performs
+static imports and type checks; cache results keyed by service hash.
+
+Security policies and rules
+
+- Imports: only `jsr:` and `https:` allowed by default; `npm:` requires explicit
+  capability and is discouraged for services.
+- Network/FS: must be declared via capabilities (allowlist of hosts; read/write
+  path allowlists). No undeclared net/FS usage.
+- Globals: no direct `Deno.` API usage; access only via provided event/context
+  data.
+- Dynamic code: disallow `eval`, `Function` constructor,
+  `WebAssembly.compileStreaming` unless explicitly permitted.
+- Resource usage: enforce max module size (e.g., 1 MB) and execution timeout
+  limits.
+- Export shape: must export default `Service` with `metadata` and `execute()`.
+
+### Sandbox Execution (Deno.Command)
+
+Services run in isolated Deno processes using `Deno.Command`, with ESM entry
+provided via URL/jsr or a `data:` URL, and strict permissions by capability.
+
+```ts
 class SandboxHost {
-  async execute(service: LoadedService, payload: ExecutePayload): Promise<any> {
-    const args = ["run", "--quiet", "--deny-all"];
+  async execute(
+    entry: string,
+    caps: Caps,
+    payload: ExecutePayload
+  ): Promise<any> {
+    const args = ["run", "--quiet", "--deny-all", "--unstable"];
 
-    // Network: allow only declared hosts. If none provided, no network.
-    if (service.capabilities.allowNetwork) {
-      const hosts = service.capabilities.networkAllowlist?.join(",") || "";
-      if (hosts) args.push(`--allow-net=${hosts}`);
-    }
+    // Env: pass minimal variables if required
+    if (caps.env?.length) args.push(`--allow-env=${caps.env.join(",")}`);
 
-    // No filesystem access: do not add --allow-read/--allow-write
-    // Execute the bundle path or a data URL/stdin-fed module
-    args.push(service.bundlePath);
+    // Network: allow only declared hosts
+    if (caps.net?.length) args.push(`--allow-net=${caps.net.join(",")}`);
 
-    const command = new Deno.Command("deno", {
+    // FS: only when absolutely necessary (e.g., sqlite file)
+    if (caps.read?.length) args.push(`--allow-read=${caps.read.join(",")}`);
+    if (caps.write?.length) args.push(`--allow-write=${caps.write.join(",")}`);
+
+    // Provide module entry: jsr:, https:, npm:, or data: URL
+    args.push(entry);
+
+    const cmd = new Deno.Command("deno", {
       args,
       stdin: "piped",
       stdout: "piped",
       stderr: "piped",
     });
+    const child = cmd.spawn();
 
-    const child = command.spawn();
-
-    // Send execution payload
+    // Send one JSON line containing the execution payload
     const writer = child.stdin.getWriter();
-    const message = new TextEncoder().encode(
-      JSON.stringify({
-        type: "execute",
-        payload,
-        traceId: crypto.randomUUID(),
-      }) + "\n"
+    await writer.write(
+      new TextEncoder().encode(JSON.stringify(payload) + "\n")
     );
-    await writer.write(message);
     await writer.close();
 
-    // Collect output with timeout
-    const timeout = service.capabilities.timeoutMs ?? 5000;
+    const timeoutMs = caps.timeoutMs ?? 5000;
     const output = await Promise.race([
       child.output(),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), timeout)
+        setTimeout(() => reject(new Error("timeout")), timeoutMs)
       ),
     ]);
 
@@ -664,10 +970,11 @@ class SandboxHost {
 }
 ```
 
-### Pubky client integration (read-only)
+### Pubky client integration (read-only, ESM)
 
-```typescript
-import { Client } from "@synonymdev/pubky";
+```ts
+// Deno Node-compat import using npm: specifier
+import { Client } from "npm:@synonymdev/pubky";
 
 // One shared client (no signup/signin needed for public reads)
 export const pk = new Client();
@@ -707,7 +1014,8 @@ export async function listServiceConfigs(prefixUrl: string) {
 
 ### Dataset Resolution
 
-Datasets are fetched from Pubky homeservers via pubky:// and cached (SQLite table `dataset_cache`).
+Datasets are fetched from Pubky homeservers via pubky:// and cached (SQLite
+table `dataset_cache`).
 
 ```typescript
 import { fetchJson } from "./pubky-client"; // see helpers above
@@ -764,6 +1072,30 @@ class DatasetManager {
 }
 ```
 
+Notes:
+
+- Cache datasets in SQLite in the parent process (not in sandboxes) and respect
+  TTLs; sandboxes should be stateless.
+- Deno caches remote modules globally in DENO_DIR; use `--reload` to refresh
+  specific modules and `deno info` to inspect cache location.
+
+### Dataset Schema Validation
+
+Supported schemas (initial):
+
+- `links@1`
+  - Shape: `{ categories: Array<{ name: string; links: Array<{ title: string; url: string }> }> }`
+  - Rules:
+    - At least one category
+    - Each link must have a valid absolute URL (http/https)
+    - Title length <= 120 chars; category name length <= 64 chars
+    - Total links per dataset <= 2000 (guardrail)
+
+Validation strategy:
+
+- Perform schema-aware validation when caching datasets.
+- On validation failure, keep the previous cached version (if any) and surface a `DataValidationError` to services; do not pass malformed data into sandboxes.
+
 ---
 
 ## 🛡️ Security Considerations
@@ -771,7 +1103,8 @@ class DatasetManager {
 ### Sandbox Security Model
 
 - **Process Isolation**: Each service execution runs in a separate process
-- **Capability-based Security**: Services only get permissions they explicitly need
+- **Capability-based Security**: Services only get permissions they explicitly
+  need
 - **Resource Limits**: CPU, and time constraints prevent resource exhaustion
 - **Network Restrictions**: Only explicitly allowed domains can be contacted
 - **No Persistent State**: Services cannot persist data between executions
@@ -779,10 +1112,24 @@ class DatasetManager {
 
 Notes
 
-- Allow-net semantics: the allowlist maps to Deno's `--allow-net` host list and is checked against the URL host, not the resolved IP. If you pass `--allow-net` without hosts, all outbound requests are allowed; always provide a comma-separated host list per service.
-- Optional deny layering: consider parent-process checks to block known-bad targets or to pin DNS if higher assurance is needed.
-- Filesystem reads: do not grant `--allow-read`. Run code via stdin or data URLs or pre-mount read-only artifacts to stay aligned with "no filesystem access".
+- Allow-net semantics: the allowlist maps to Deno's `--allow-net` host list and
+  is checked against the URL host, not the resolved IP. If you pass
+  `--allow-net` without hosts, all outbound requests are allowed; always provide
+  a comma-separated host list per service.
+- Optional deny layering: consider parent-process checks to block known-bad
+  targets or to pin DNS if higher assurance is needed.
+- Filesystem reads: do not grant `--allow-read`. Run code via stdin or data URLs
+  or pre-mount read-only artifacts to stay aligned with "no filesystem access".
 - Whitelist of allowed Services in Bot-Core could be implemented.
+
+Deno-specific notes:
+
+- Use `--deny-all` by default and add granular flags: `--allow-net=<hosts>` only
+  when declared by service capabilities.
+- Prefer stdin/data:URL module execution to avoid filesystem reads in sandboxes;
+  if a file is unavoidable, limit `--allow-read` to the single bundle path.
+- Manage module integrity with `deno.lock` and pin `jsr:` versions for immutable
+  service releases.
 
 ### Configuration Security
 
@@ -793,7 +1140,9 @@ Notes
 
 ### Data Privacy
 
-- **No Message Logging**: Services don't have access to persistent message history => Setting a listener that catches any message and stores it externally could still technically allow a service to log everything.
+- **No Message Logging**: Services don't have access to persistent message
+  history => Setting a listener that catches any message and stores it
+  externally could still technically allow a service to log everything.
 - **Ephemeral State**: Conversation state has configurable TTL
 - **Minimal Data Exposure**: Services only receive data they need for execution
 
@@ -804,14 +1153,20 @@ Notes
 A companion web application for:
 
 - Creating and managing service configurations
-  - Users can register new services and easily configure related Datasets with validation from Examples.
+  - Users can register new services and easily configure related Datasets with
+    validation from Examples.
   - Simple JSON-Writer during development.
 - Bot configs
-  - Allows user to create a simple bot-config by displaying a list of all registered services and allowing them to drag and drop them into their config.
-- Display of pre-configured bot-configs (created by myself) for users that don't want to create custom ones. Outlining what they do. => Displaying this on telegram as well would make sense.
+  - Allows user to create a simple bot-config by displaying a list of all
+    registered services and allowing them to drag and drop them into their
+    config.
+- Display of pre-configured bot-configs (created by myself) for users that don't
+  want to create custom ones. Outlining what they do. => Displaying this on
+  telegram as well would make sense.
 - Page explaining usage of Bot and how it works.
 - Based on next.js
-- Idea is to start with a more simple web-interface that can then grow to allowing more features like:
+- Idea is to start with a more simple web-interface that can then grow to
+  allowing more features like:
   - Semantic Tagging and Discovery of configured Services and Bot configurations
   - Drag and drop style service and bot builder
   - Versioned udpdates of services
@@ -824,13 +1179,16 @@ A companion web application for:
 - **Welcome message**
 - **Links** - With categories as inline-keyboard callback
 - **NIP-52 Meetup-puller**
-  - Use either meetstr-api or fetch directly using ndk (https://meetstr.com/api/calendar/naddr1qvzqqqrukspzpzd4ye7z7x886as20jpf8xw46rdfywmg04f75f4xl566wu8entspqqyrsdeevfskxvfj8p34pq)
+  - Use either meetstr-api or fetch directly using ndk
+    (https://meetstr.com/api/calendar/naddr1qvzqqqrukspzpzd4ye7z7x886as20jpf8xw46rdfywmg04f75f4xl566wu8entspqqyrsdeevfskxvfj8p34pq)
   - Config for timerange-callback (or disabled) and calendar naddr for callback
 - **Periodically pull Meetups**
 - **Tracking-URL cleaner** - Responds with URL without trackers.
-- **Alternative Frontends** - Responds with url to alternative frontend like nitter
+- **Alternative Frontends** - Responds with url to alternative frontend like
+  nitter
   - Dataset mapping frontends to alternative ones
-- **Shitcoin-Alarm** - Responds to someone mentioning shitcoins/shitcoiner with a joke
+- **Shitcoin-Alarm** - Responds to someone mentioning shitcoins/shitcoiner with
+  a joke
   - Dataset for both triggerwords and Jokes.
   - Seperate Ethereum Dataset with jokes linking to https://pocketethereum.com
 
@@ -861,9 +1219,14 @@ Complete working examples services are provided for:
 
 ## 🚀 Future Enhancements
 
-- Implement Core-Bot functionality for other messengers like Matrix, Signal, Discord, ...
+- Implement Core-Bot functionality for other messengers like Matrix, Signal,
+  Discord, ...
 - Improve Web UI functionalities for simpler configs
-  - Create a deep-linking signing-service to allow users to store meetups (or other events) either on nostr or pubky by opening generated url and signing it in web-interface. This would also allow forwarding the formatted event to admins who sign it on their behalf.
-- Create Services allowing creation of Meetups for both NIP-52 and Calky based calendars using above described method for signing
+  - Create a deep-linking signing-service to allow users to store meetups (or
+    other events) either on nostr or pubky by opening generated url and signing
+    it in web-interface. This would also allow forwarding the formatted event to
+    admins who sign it on their behalf.
+- Create Services allowing creation of Meetups for both NIP-52 and Calky based
+  calendars using above described method for signing
 - Create Docker Image
 - Allow hosting bot instance on Start9/Umbrel nodes

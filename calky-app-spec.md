@@ -2,15 +2,23 @@
 
 ## Project Overview
 
-Calky is a decentralized calendar application built on Pubky Core, following iCalendar standards (RFC 5545, RFC 7986) for calendar data management. The application enables public calendar sharing while maintaining user ownership of data through Pubky's homeserver architecture. All calendars and events are publicly accessible by default, following Pubky's open data philosophy.
+Calky is a decentralized calendar application built on Pubky Core, following
+iCalendar standards (RFC 5545, RFC 7986) for calendar data management. The
+application enables public calendar sharing while maintaining user ownership of
+data through Pubky's homeserver architecture. All calendars and events are
+publicly accessible by default, following Pubky's open data philosophy.
 
 ## Architecture Pattern
 
-- **Frontend**: Next.js application that aggregates calendar data from multiple Pubky homeservers
-- **Data Storage**: Each user stores their calendar configurations and events on their own homeserver
+- **Frontend**: Next.js application that aggregates calendar data from multiple
+  Pubky homeservers
+- **Data Storage**: Each user stores their calendar configurations and events on
+  their own homeserver
 - **Discovery**: Uses Nexus patterns for discovering public calendars and events
-- **Standards Compliance**: Full iCalendar (RFC 5545) compatibility with proper VEVENT structures
-- **Public Data**: All calendar data is publicly accessible, with write permissions controlled by user authentication
+- **Standards Compliance**: Full iCalendar (RFC 5545) compatibility with proper
+  VEVENT structures
+- **Public Data**: All calendar data is publicly accessible, with write
+  permissions controlled by user authentication
 
 ## Data Structure
 
@@ -18,8 +26,10 @@ Calky is a decentralized calendar application built on Pubky Core, following iCa
 
 - **Base path**: `/pub/calky.app/`
 - **Calendar configs**: `/pub/calky.app/calendars/{calendar-uuid}`
-- **Events referencing calendars**: `/pub/calky.app/events/{calendar-uuid}/{event-uuid}`
-- **User's own events**: `/pub/calky.app/events/{event-uuid}` (for events not tied to shared calendars)
+- **Events referencing calendars**:
+  `/pub/calky.app/events/{calendar-uuid}/{event-uuid}`
+- **User's own events**: `/pub/calky.app/events/{event-uuid}` (for events not
+  tied to shared calendars)
 
 ### Calendar Configuration Structure
 
@@ -92,7 +102,8 @@ Calky is a decentralized calendar application built on Pubky Core, following iCa
 
 ### Tag Structure (Following Pubky App Pattern)
 
-Tags are created as separate objects that reference calendars or events, following the exact same pattern as Pubky App:
+Tags are created as separate objects that reference calendars or events,
+following the exact same pattern as Pubky App:
 
 ```json
 {
@@ -128,9 +139,12 @@ Tags are created as separate objects that reference calendars or events, followi
    - Real-time aggregation from multiple homeservers
 
 4. **Collaboration Features**
-   - Calendar owners can designate admin users who are authorized to create events under the calendar UUID
-   - Admins create events on their own homeservers at `/pub/calky.app/events/{calendar-uuid}/{event-uuid}`
-   - Frontend aggregates all events referencing the same calendar UUID from all homeservers
+   - Calendar owners can designate admin users who are authorized to create
+     events under the calendar UUID
+   - Admins create events on their own homeservers at
+     `/pub/calky.app/events/{calendar-uuid}/{event-uuid}`
+   - Frontend aggregates all events referencing the same calendar UUID from all
+     homeservers
    - Tag calendars and events from any user
    - Calendar subscription and following mechanisms
 
@@ -240,7 +254,7 @@ class CalkyHomeserverClient {
   async createCalendar(config: CalendarConfig): Promise<string>;
   async updateCalendarAdmins(
     calendarId: string,
-    admins: Admin[]
+    admins: Admin[],
   ): Promise<void>;
   async createEvent(event: Event, calendarId?: string): Promise<string>;
   async updateEvent(eventId: string, event: Partial<Event>): Promise<void>;
@@ -254,7 +268,7 @@ class CalkyNexusClient {
   async searchCalendars(query: SearchQuery): Promise<CalendarSearchResult[]>;
   async getEventStream(filters: EventStreamFilters): Promise<EventStream>;
   async getCalendarNotifications(
-    userId: string
+    userId: string,
   ): Promise<CalendarNotification[]>;
   async getCalendarTags(calendarId: string): Promise<TagDetails[]>;
   async getEventTags(eventId: string): Promise<TagDetails[]>;
@@ -263,23 +277,32 @@ class CalkyNexusClient {
 
 ### Access Control Flow
 
-1. **Calendar Ownership**: Only calendar owners can modify calendar configuration and add/remove admins
+1. **Calendar Ownership**: Only calendar owners can modify calendar
+   configuration and add/remove admins
 2. **Event Creation**:
    - Calendar owners can always create events under their calendar UUID
-   - Designated admins can create events on their own homeservers under the calendar UUID path
-   - Events are stored at `/pub/calky.app/events/{calendar-uuid}/{event-uuid}` on each user's homeserver
-3. **Event Modification**: Users can only modify events they created on their own homeserver
-4. **Event Aggregation**: Frontend aggregates all events from all homeservers that reference the same calendar UUID
+   - Designated admins can create events on their own homeservers under the
+     calendar UUID path
+   - Events are stored at `/pub/calky.app/events/{calendar-uuid}/{event-uuid}`
+     on each user's homeserver
+3. **Event Modification**: Users can only modify events they created on their
+   own homeserver
+4. **Event Aggregation**: Frontend aggregates all events from all homeservers
+   that reference the same calendar UUID
 5. **Public Access**: All calendars and events are publicly readable by default
-6. **Tagging**: Any user can tag any calendar or event (following Pubky App patterns)
+6. **Tagging**: Any user can tag any calendar or event (following Pubky App
+   patterns)
 7. **iCalendar Compliance**: Validate all event data follows RFC 5545 standards
 
 ### Error Handling
 
-- **Access Denied**: Clear messaging when users try to modify calendars/events they don't own
-- **Homeserver Unavailable**: Graceful degradation when source homeservers are offline
+- **Access Denied**: Clear messaging when users try to modify calendars/events
+  they don't own
+- **Homeserver Unavailable**: Graceful degradation when source homeservers are
+  offline
 - **Data Conflicts**: Resolution strategies for conflicting event modifications
-- **iCalendar Validation Errors**: User-friendly validation messages for invalid event data
+- **iCalendar Validation Errors**: User-friendly validation messages for invalid
+  event data
 - **Tag Validation**: Ensure tags follow Pubky App patterns and constraints
 
 ## Standards Compliance
